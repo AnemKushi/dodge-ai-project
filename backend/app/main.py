@@ -42,6 +42,7 @@ def health():
     return {"status": "ok"}
 
 
+@app.get("/api/init")
 @app.post("/api/init")
 def initialize_graph():
     """Initialize graph with data from JSONL files"""
