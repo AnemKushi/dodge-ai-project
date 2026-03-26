@@ -1,1 +1,1 @@
-web: cd backend && pip install -r requirements.txt && python run_server.py
+web: cd backend && python run_server.py
