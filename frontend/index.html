@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Graph AI System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+        
+        #graph { 
+            background-color: #ffffff; 
+            background-image: radial-gradient(#91b3df 1.2px, transparent 1.2px); 
+            background-size: 24px 24px; 
+        }
+
+        #detail-card {
+            display: none;
+            position: absolute;
+            z-index: 50;
+            width: 300px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+            border: 1px solid #e2e8f0;
+        }
+
+        #messages::-webkit-scrollbar { width: 4px; }
+        #messages::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+        
+    </style>
+</head>
+
+<body class="h-screen flex overflow-hidden text-slate-900">
+
+<div class="flex-1 relative border-r border-slate-200">
+    <div class="absolute top-6 left-8 z-10 flex items-center gap-3">
+        <div class="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></div>
+        <h1 class="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+            Context Graph / Order to Cash
+        </h1>
+    </div>
+
+    <div id="detail-card" class="p-5">
+        <div class="flex justify-between items-center mb-4 border-b border-slate-50 pb-2">
+            <h3 id="card-title" class="font-bold text-slate-800 text-sm">Details</h3>
+            <button onclick="closeCard()" class="text-slate-400 hover:text-slate-600 text-xl">&times;</button>
+        </div>
+        <div id="card-content" class="space-y-2 text-[11px] text-slate-600"></div>
+    </div>
+
+    <div id="graph" class="w-full h-full"></div>
+</div>
+
+<div class="w-[420px] bg-white flex flex-col shadow-2xl relative z-20">
+    <div class="p-6 border-b border-slate-100 flex items-center gap-4">
+        <div class="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center text-white font-bold shadow-lg">G</div>
+        <div>
+            <h2 class="font-semibold text-sm">Graph Assistant</h2>
+            <div class="flex items-center gap-1.5">
+                <span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                <span class="text-[10px] text-slate-400 font-bold uppercase">System Online</span>
+            </div>
+        </div>
+    </div>
+
+    <div id="messages" class="flex-1 p-6 overflow-y-auto space-y-6 bg-slate-50/30">
+        <div class="text-slate-400 text-xs italic">Hi, how can I help you today?</div>
+    </div>
+
+    <div class="p-6 bg-white border-t border-slate-100">
+        <div class="relative">
+            <input id="question"
+                   class="w-full pl-5 pr-12 py-3.5 rounded-2xl bg-slate-100 outline-none focus:ring-2 focus:ring-blue-500/20 text-sm"
+                   placeholder="Ask about orders, invoices..." 
+                   onkeydown="if(event.key==='Enter') sendQuery()" />
+            
+            <button onclick="sendQuery()" 
+                    class="absolute right-3 top-1/2 -translate-y-1/2 p-2 text-blue-600 hover:scale-110">
+                ➤
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    let network;
+    let nodesSet, edgesSet;
+    function drawGraph(nodesData = [], edgesData = []) {
+    const container = document.getElementById("graph");
+
+    // 🔥 DEBUG (check in console)
+    console.log("NODES:", nodesData);
+    console.log("EDGES:", edgesData);
+
+    // ❌ If no edges → show fallback
+    if (!edgesData || edgesData.length === 0) {
+        console.warn("⚠️ No edges received from backend");
+    }
+
+    // ✅ FORCE SAFE IDS (VERY IMPORTANT)
+    const nodeIds = new Set(nodesData.map(n => String(n.id)));
+
+    edgesData = (edgesData || [])
+        .map((e, i) => ({
+            id: e.id || "e" + i,
+            from: String(e.from),
+            to: String(e.to),
+            label: e.label || "",
+            arrows: "to"
+        }))
+        // ❌ REMOVE INVALID EDGES
+        .filter(e => nodeIds.has(e.from) && nodeIds.has(e.to));
+
+    nodesSet = new vis.DataSet(nodesData);
+    edgesSet = new vis.DataSet(edgesData);
+
+    const data = {
+        nodes: nodesSet,
+        edges: edgesSet
+    };
+
+    const options = {
+        nodes: {
+            shape: "dot",
+            size: 18,
+            borderWidth: 2,
+            font: { size: 14 }
+        },
+
+        edges: {
+            arrows: {
+                to: { enabled: true, scaleFactor: 1.2 }
+            },
+            width: 2,
+            smooth: true
+        },
+
+        physics: {
+            enabled: true,
+            solver: "forceAtlas2Based",
+            forceAtlas2Based: {
+                gravitationalConstant: -80,
+                springLength: 150
+            }
+        }
+    };
+
+    network = new vis.Network(container, data, options);
+
+    applyNodeStyles();
+}
+
+
+// 🎨 COLOR
+function applyNodeStyles() {
+    nodesSet.forEach(node => {
+        let color = "#64748b";
+
+        if (node.label.includes("Customer")) color = "#3b82f6";
+        else if (node.label.includes("Invoice")) color = "#10b981";
+        else if (node.label.includes("Product")) color = "#f59e0b";
+        else if (node.label.includes("Order")) color = "#8b5cf6";
+
+        nodesSet.update({
+            id: node.id,
+            color: {
+                background: "#ffffff",
+                border: color
+            }
+        });
+    });
+}
+
+// 🔥 HIGHLIGHT
+function highlightConnections(nodeId) {
+    const connectedNodes = network.getConnectedNodes(nodeId);
+
+    nodesSet.forEach(node => {
+        nodesSet.update({
+            id: node.id,
+            opacity: (node.id === nodeId || connectedNodes.includes(node.id)) ? 1 : 0.2
+        });
+    });
+}
+
+function resetHighlight() {
+    nodesSet.forEach(node => {
+        nodesSet.update({ id: node.id, opacity: 1 });
+    });
+}
+
+// 🚀 CHAT
+async function sendQuery() {
+    const input = document.getElementById("question");
+    const question = input.value;
+    if (!question) return;
+
+    addMessage("You", question);
+    input.value = "";
+    addMessage("Bot", "...");
+
+    try {
+        const res = await fetch("http://127.0.0.1:8000/api/chat", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({ question })
+        });
+
+        const data = await res.json();
+
+        replaceLastMessage(data.answer || "No response");
+
+        // 🔥 IMPORTANT: redraw graph with new data
+        if (data.nodes && data.edges) {
+            drawGraph(data.nodes, data.edges);
+        }
+
+    } catch (err) {
+        replaceLastMessage("⚠️ Backend error - is the server running? Try http://127.0.0.1:8000/health");
+        console.error(err);
+    }
+}
+
+// 💬 UI
+function addMessage(sender, text) {
+    const container = document.getElementById("messages");
+
+    const div = document.createElement("div");
+    const isUser = sender === "You";
+
+    div.className = `flex ${isUser ? "justify-end" : "justify-start"}`;
+    div.innerHTML = `
+        <div class="max-w-[80%]">
+            <div class="text-[10px] text-slate-400 mb-1">${sender}</div>
+            <div class="px-4 py-2 rounded-2xl text-sm shadow
+                ${isUser ? "bg-slate-900 text-white" : "bg-white border"}">
+                ${text}
+            </div>
+        </div>
+    `;
+
+    container.appendChild(div);
+    container.scrollTop = container.scrollHeight;
+}
+
+function replaceLastMessage(text) {
+    const container = document.getElementById("messages");
+    if (container.lastChild) container.removeChild(container.lastChild);
+    addMessage("Bot", text);
+}
+
+// 📌 CARD
+function showDetailCard(pointer, data) {
+    const card = document.getElementById("detail-card");
+    const title = document.getElementById("card-title");
+    const content = document.getElementById("card-content");
+
+    title.innerText = data.label;
+
+    let html = "";
+    for (const [key, value] of Object.entries(data)) {
+        if (!["id","label","color","opacity"].includes(key)) {
+            html += `
+            <div class="flex justify-between text-xs border-b py-1">
+                <span>${key}</span>
+                <span>${value}</span>
+            </div>`;
+        }
+    }
+
+    content.innerHTML = html || "No metadata";
+
+    card.style.display = "block";
+    card.style.left = (pointer.x + 15) + "px";
+    card.style.top = (pointer.y + 15) + "px";
+}
+
+function closeCard() {
+    document.getElementById("detail-card").style.display = "none";
+}
+
+// 🔥 INITIAL LOAD GRAPH (IMPORTANT)
+drawGraph();
+
+</script>
+
+
+</body>
+</html>
