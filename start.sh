@@ -4,6 +4,11 @@
 pip install --upgrade pip
 pip install -r backend/requirements.txt
 
-
 # Start the server
-uvicorn backend.run_server:app --host 0.0.0.0 --port $PORT
+# For local development: use 127.0.0.1
+# For production (Railway, etc): use 0.0.0.0
+HOST=${HOST:-0.0.0.0}
+PORT=${PORT:-8000}
+RELOAD=${RELOAD:-false}
+
+uvicorn backend.app.main:app --host $HOST --port $PORT --reload=$RELOAD
