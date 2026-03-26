@@ -203,7 +203,7 @@ async function sendQuery() {
     addMessage("Bot", "...");
 
     try {
-        const res = await fetch("http://127.0.0.1:8000/api/chat", {
+        const res = await fetch("https://dodge-ai-project-production.up.railway.app/api/chat", {
             method: "POST",
             headers: {"Content-Type": "application/json"},
             body: JSON.stringify({ question })
@@ -219,7 +219,7 @@ async function sendQuery() {
         }
 
     } catch (err) {
-        replaceLastMessage("⚠️ Backend error - is the server running? Try http://127.0.0.1:8000/health");
+        replaceLastMessage("⚠️ Backend error - Check console. Backend: https://dodge-ai-project-production.up.railway.app");
         console.error(err);
     }
 }
